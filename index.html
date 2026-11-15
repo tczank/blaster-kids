@@ -658,12 +658,23 @@
     {n:'Aleatório',     g:'random', s:'random',     c:'#ffffff', c2:'#8888ff', w:'???!'}
   ];
 
+  /* ---- toque à prova de criança pequena ----
+     ignora mão apoiada / vários dedos; só conta toque de dedo, curto e parado */
+  const activePtr=new Set();
+  document.addEventListener('pointerdown',e=>{ activePtr.add(e.pointerId); },{passive:true,capture:true});
+  ['pointerup','pointercancel','lostpointercapture'].forEach(ev=>
+    document.addEventListener(ev,e=>{ activePtr.delete(e.pointerId); },{passive:true,capture:true}));
+  function isPalm(e){
+    return (e.width>60 && e.height>60) || (e.width>110) || (e.height>110);
+  }
+  function isGrab(e){ return isPalm(e) || activePtr.size>=4; }
+
   MODES.forEach((m,i)=>{
     const b=document.createElement('button');
     b.className='mode'+(m.g==='random'?' rand':'');
     b.style.color=m.c;
     b.innerHTML='<span class="dot"></span>'+m.n;
-    b.addEventListener('pointerdown',e=>{ e.stopPropagation(); setMode(i); });
+    b.addEventListener('pointerdown',e=>{ e.stopPropagation(); if(!isGrab(e)) setMode(i); });
     modesBar.appendChild(b);
   });
   const chips=[...modesBar.children];
@@ -687,19 +698,30 @@
     textPop(W/2, H*0.40, m.n, m.c, 42);
     if(navigator.vibrate) navigator.vibrate(14);
   }
-  function navPress(d){
-    return e=>{
+  /* troca de arma: só conta como toque se for 1 dedo, rápido e quase parado */
+  let navG=null, navLast=0;
+  const NAVS={'prev':-1,'next':1};
+  Object.keys(NAVS).forEach(id=>{
+    const b=$(id), d=NAVS[id];
+    b.addEventListener('pointerdown',e=>{
       e.preventDefault(); e.stopPropagation();
-      stepMode(d);
-    };
-  }
-  $('prev').addEventListener('pointerdown', navPress(-1));
-  $('next').addEventListener('pointerdown', navPress(1));
-  ['prev','next'].forEach(id=>{
-    const b=$(id);
+      navG = isGrab(e) ? null : {id:e.pointerId, x:e.clientX, y:e.clientY, t:performance.now(), d};
+    });
     b.addEventListener('contextmenu',e=>e.preventDefault());
     b.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); });
   });
+  window.addEventListener('pointerup',e=>{
+    if(!navG || e.pointerId!==navG.id) return;
+    const g=navG; navG=null;
+    const dt=performance.now()-g.t;
+    const dist=Math.hypot(e.clientX-g.x, e.clientY-g.y);
+    if(dt>900 || dist>24) return;          /* mão apoiada/arrastando: ignora */
+    if(isGrab(e)) return;
+    if(performance.now()-navLast<140) return;
+    navLast=performance.now();
+    stepMode(g.d);
+  },{passive:true});
+  window.addEventListener('pointercancel',()=>{ navG=null; },{passive:true});
 
   function fire(){
     const c=audio(); if(!c) return;
@@ -730,6 +752,7 @@
   function down(e){
     if(e.target.closest('.mode') || e.target.closest('.nav')) return;
     if(e.pointerType==='mouse' && e.button!==0) return;
+    if(isGrab(e)){ endHold(); return; }     /* mão apoiada / 2+ dedos: não atira */
     e.preventDefault();
     endHold();
     holding=true; fire();
