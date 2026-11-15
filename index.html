@@ -55,6 +55,28 @@
   .mode.active .dot{ background:var(--c); }
   .mode.rand{ border-style:dashed; }
 
+  /* cartão educativo: uma letra/palavra por vez, grande e legível */
+  #card{ position:fixed; left:50%; top:32%; transform:translate(-50%,-50%) scale(.6);
+         z-index:9; display:flex; flex-direction:column; align-items:center;
+         width:96vw; text-align:center; pointer-events:none; opacity:0; }
+  #card.show{ animation:cardPop 2.8s ease-out forwards; }
+  @keyframes cardPop{
+    0%{opacity:0; transform:translate(-50%,-50%) scale(.5)}
+    4%{opacity:1; transform:translate(-50%,-50%) scale(1.16)}
+    10%{transform:translate(-50%,-50%) scale(.93)}
+    16%{transform:translate(-50%,-50%) scale(1.08)}
+    22%{transform:translate(-50%,-50%) scale(.97)}
+    28%{transform:translate(-50%,-50%) scale(1.03)}
+    34%{transform:translate(-50%,-50%) scale(1)}
+    86%{opacity:1; transform:translate(-50%,-50%) scale(1)}
+    100%{opacity:0; transform:translate(-50%,-50%) scale(1.04)}
+  }
+  #cardCh{ font-weight:900; font-size:clamp(96px,34vw,240px); line-height:.9;
+           text-shadow:0 0 34px var(--c), 0 8px 0 #0007, 0 0 4px #000; }
+  #cardWord{ font-weight:900; font-size:clamp(28px,10vw,64px); line-height:1.1; margin-top:4px;
+             text-shadow:0 0 22px var(--c), 0 4px 0 #0008, 0 0 4px #000;
+             overflow-wrap:break-word; }
+
   #hint{ position:fixed; bottom:10px; left:0; right:0; text-align:center; font-size:clamp(10px,3vw,13px); color:#ffffff80; pointer-events:none; z-index:10; }
 
   /* botões grandes de troca de arma */
@@ -114,6 +136,8 @@
   </div>
 </div>
 
+<div id="card"><div id="cardCh"></div><div id="cardWord"></div></div>
+
 <div id="flash"></div>
 <div id="hint">Toque para atirar — ‹ › trocam de arma</div>
 
@@ -121,6 +145,7 @@
 (function(){
   const $=id=>document.getElementById(id);
   const gun=$('gun'), flash=$('flash'), scoreEl=$('score'), comboEl=$('combo'), modesBar=$('modes');
+  const card=$('card'), cardCh=$('cardCh'), cardWord=$('cardWord');
   const cv=$('fx'), cx=cv.getContext('2d');
   let W=0,H=0,DPR=1,MX=0,MY=0,FLOOR=0;
   function resize(){
@@ -588,7 +613,7 @@
     ['13','treze'],['14','catorze'],['15','quinze'],['16','dezesseis'],['17','dezessete'],
     ['18','dezoito'],['19','dezenove'],['20','vinte']];
   const EDU_COLORS=['#ffd24a','#ff7a00','#25f4ff','#5dff6b','#c46bff','#ff4dd2','#9dff3a','#7ad7ff','#ff5a2f','#ffffff'];
-  let alphaIdx=0, numIdx=0;
+  let alphaIdx=0, numIdx=0, cardT=0;
 
   function speak(txt){
     try{
@@ -609,18 +634,25 @@
     if(kind==='alphabet'){ const a=ALPHABET[alphaIdx % ALPHABET.length]; alphaIdx++; ch=a[0]; word=a[1]; }
     else { const n=NUMBERS[numIdx % NUMBERS.length]; numIdx++; ch=n[0]; word=n[1]; }
     const color=EDU_COLORS[Math.floor(Math.random()*EDU_COLORS.length)];
-    spawn({t:'letter',x,y,vx:rnd(-30,30),vy:-120,rot:rnd(-0.15,0.15),spin:rnd(-0.7,0.7),txt:ch,sub:word,color,size:rnd(110,150),life:2.1,max:2.1});
+    /* cartão único: letra/número grande + palavra inteira embaixo */
+    card.style.setProperty('--c', color);
+    cardCh.textContent = ch;
+    cardWord.textContent = word;
+    card.classList.remove('show'); void card.offsetWidth;
+    card.classList.add('show');
+    clearTimeout(cardT); cardT=setTimeout(()=>card.classList.remove('show'),2900);
+    /* fagulhas de festa no cano, sem atrapalhar a leitura */
     spawn({t:'glow',x,y,r:110,life:0.25,max:0.25,color});
     ring(x,y,color,180,0.5,3);
-    for(let i=0;i<30;i++){
-      const ang=rnd(-Math.PI*0.95,-Math.PI*0.05), sp=rnd(80,420);
+    for(let i=0;i<22;i++){
+      const ang=rnd(-Math.PI*0.95,-Math.PI*0.05), sp=rnd(80,400);
       spawn({t:'confetti',x,y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,w:rnd(3,7),h:rnd(5,11),rot:rnd(0,6),spin:rnd(-12,12),life:rnd(0.7,1.6),max:1.6,color:EDU_COLORS[Math.floor(Math.random()*EDU_COLORS.length)]});
     }
-    for(let i=0;i<18;i++){
-      const ang=rnd(-Math.PI*0.95,-Math.PI*0.05), sp=rnd(100,500);
+    for(let i=0;i<12;i++){
+      const ang=rnd(-Math.PI*0.95,-Math.PI*0.05), sp=rnd(100,460);
       spawn({t:'star',x,y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,r:rnd(4,10),rot:rnd(0,6),life:rnd(0.3,0.8),max:0.8,color:'#fff'});
     }
-    flashScreen(); shake(90);
+    shake();
     chime();
     speak(kind==='alphabet' ? ch+' de '+word : word);
   }
