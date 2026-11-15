@@ -708,12 +708,14 @@
       const pool=MODES.filter(x=>x.g!=='random' && x.g!=='edu');
       m=pool[Math.floor(Math.random()*pool.length)];
     }
-    SOUND[m.s]();
-    if(m.g==='powder') powderFX(m.c,m.w);
-    else if(m.g==='laser') laserFX(m.c,m.w);
-    else if(m.g==='element') ELEMENT_FX[m.s](m.c,m.w);
-    else if(m.g==='edu') eduFX(m.s);
-    else specialFX(m.s,m.c,m.w);
+    if(m.g==='edu'){ eduFX(m.s); }
+    else {
+      SOUND[m.s]();
+      if(m.g==='powder') powderFX(m.c,m.w);
+      else if(m.g==='laser') laserFX(m.c,m.w);
+      else if(m.g==='element') ELEMENT_FX[m.s](m.c,m.w);
+      else specialFX(m.s,m.c,m.w);
+    }
     if(navigator.vibrate) navigator.vibrate(m.g==='powder'?45:22);
     score++; scoreEl.textContent=score;
     const now=performance.now();
@@ -723,18 +725,32 @@
     if(combo>0 && combo%10===0){ const {x,y}=muzzlePos(); textPop(x,y-80,'COMBO x'+combo,'#fff',46); }
   }
 
+  let stopHold=null;
+  function endHold(){ holding=false; if(shotTimer){ clearInterval(shotTimer); shotTimer=0; } }
   function down(e){
     if(e.target.closest('.mode') || e.target.closest('.nav')) return;
+    if(e.pointerType==='mouse' && e.button!==0) return;
     e.preventDefault();
+    endHold();
     holding=true; fire();
-    clearInterval(shotTimer);
     if(MODES[modeIndex].g!=='edu'){
-      shotTimer=setInterval(()=>{ if(holding) fire(); }, 115);
+      const t0=performance.now();
+      /* teto de 2,2s: se o navegador "perder" o pointerup, não dispara pra sempre */
+      shotTimer=setInterval(()=>{
+        if(!holding || performance.now()-t0>2200){ endHold(); return; }
+        fire();
+      }, 115);
     }
-    const stop=()=>{ holding=false; clearInterval(shotTimer); window.removeEventListener('pointerup',stop); window.removeEventListener('pointercancel',stop); };
-    window.addEventListener('pointerup',stop); window.addEventListener('pointercancel',stop);
+    if(!stopHold){
+      stopHold=()=>{ endHold(); };
+      ['pointerup','pointercancel','touchend','touchcancel','mouseup'].forEach(ev=>
+        window.addEventListener(ev,stopHold,{passive:true}));
+    }
   }
   document.addEventListener('pointerdown',down,{passive:false});
+  /* segurança: nunca continuar atirando se a aba sai de foco */
+  document.addEventListener('visibilitychange',()=>{ if(document.hidden) endHold(); });
+  addEventListener('blur',endHold);
   document.addEventListener('contextmenu',e=>e.preventDefault());
   let lastTouch=0;
   document.addEventListener('touchend',e=>{ const n=Date.now(); if(n-lastTouch<=300) e.preventDefault(); lastTouch=n; },{passive:false});
@@ -742,7 +758,15 @@
   // combo fades
   setInterval(()=>{ if(performance.now()-lastShotAt>1200){ combo=0; comboEl.classList.remove('on'); } },300);
 
-  setMode(0);
+  /* abrir direto num modo: ?m=alfabeto */
+  (function(){
+    const q=new URLSearchParams(location.search).get('m');
+    if(!q) return;
+    const norm=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const i=MODES.findIndex(x=>norm(x.n)===norm(q));
+    if(i>=0) modeIndex=i;
+  })();
+  setMode(modeIndex);
 })();
 </script>
 </body>
