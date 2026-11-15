@@ -56,7 +56,23 @@
   .mode.rand{ border-style:dashed; }
 
   #hint{ position:fixed; bottom:10px; left:0; right:0; text-align:center; font-size:clamp(10px,3vw,13px); color:#ffffff80; pointer-events:none; z-index:10; }
-  @media (orientation:landscape){ #gun{ width:min(34vw,300px); margin-bottom:4vh; } }
+
+  /* botões grandes de troca de arma */
+  .nav{ position:fixed; top:44%; transform:translateY(-50%);
+        width:clamp(66px,18vw,100px); height:clamp(66px,18vw,100px);
+        border-radius:50%; z-index:12; padding:0;
+        display:flex; align-items:center; justify-content:center;
+        font:900 clamp(38px,11vw,58px)/1 system-ui,sans-serif; color:#fff;
+        background:#ffffff14; border:2px solid #ffffff30;
+        -webkit-backdrop-filter:blur(6px); backdrop-filter:blur(6px);
+        box-shadow:0 8px 24px #000a, inset 0 0 20px #ffffff12, 0 0 22px -6px var(--c);
+        text-shadow:0 0 16px var(--c);
+        touch-action:none; user-select:none; -webkit-user-select:none;
+        transition:transform .11s ease-out, background .15s; }
+  .nav:active{ transform:translateY(-50%) scale(.9); background:#ffffff2e; }
+  #prev{ left:clamp(8px,2.5vw,20px); }
+  #next{ right:clamp(8px,2.5vw,20px); }
+  @media (orientation:landscape){ #gun{ width:min(34vw,300px); margin-bottom:4vh; } .nav{ top:50%; } }
 </style>
 </head>
 <body>
@@ -69,6 +85,9 @@
   <div id="score">0</div>
 </div>
 <div id="modes"></div>
+
+<button id="prev" class="nav" aria-label="Arma anterior">‹</button>
+<button id="next" class="nav" aria-label="Próxima arma">›</button>
 
 <div id="stage">
   <div id="gun">
@@ -96,7 +115,7 @@
 </div>
 
 <div id="flash"></div>
-<div id="hint">Toque para atirar — segure para tiro rápido</div>
+<div id="hint">Toque para atirar — ‹ › trocam de arma</div>
 
 <script>
 (function(){
@@ -660,6 +679,28 @@
     if(SOUND.click) SOUND.click(); else if(ctx){ const t=ctx.currentTime; osc('sine',900,t,0.06,0.05,1300,0.05); }
   }
 
+  /* botões grandes de troca de arma */
+  function stepMode(d){
+    const n=MODES.length;
+    setMode((modeIndex+d+n)%n);
+    const m=MODES[modeIndex];
+    textPop(W/2, H*0.40, m.n, m.c, 42);
+    if(navigator.vibrate) navigator.vibrate(14);
+  }
+  function navPress(d){
+    return e=>{
+      e.preventDefault(); e.stopPropagation();
+      stepMode(d);
+    };
+  }
+  $('prev').addEventListener('pointerdown', navPress(-1));
+  $('next').addEventListener('pointerdown', navPress(1));
+  ['prev','next'].forEach(id=>{
+    const b=$(id);
+    b.addEventListener('contextmenu',e=>e.preventDefault());
+    b.addEventListener('click',e=>{ e.preventDefault(); e.stopPropagation(); });
+  });
+
   function fire(){
     const c=audio(); if(!c) return;
     let m=MODES[modeIndex];
@@ -683,7 +724,7 @@
   }
 
   function down(e){
-    if(e.target.closest('.mode')) return;
+    if(e.target.closest('.mode') || e.target.closest('.nav')) return;
     e.preventDefault();
     holding=true; fire();
     clearInterval(shotTimer);
